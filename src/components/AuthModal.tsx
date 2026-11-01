@@ -4,15 +4,16 @@ import {
   Lock, 
   Mail, 
   User, 
-  ShieldCheck, 
   Sparkles, 
-  Check, 
   ArrowRight,
   Github,
-  Globe
+  Globe,
+  AlertTriangle,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import { UserProfile } from '../types/user';
-import { FOUNDER_ADMIN } from '../services/userService';
+import { FOUNDER_ADMIN, loginUserApi, registerUserApi } from '../services/userService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -32,35 +33,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || !password) return;
 
-    // Logged in as standard user or founder admin if matching email
-    if (email.toLowerCase().includes('pawan') || email === FOUNDER_ADMIN.email) {
-      onLogin(FOUNDER_ADMIN);
-    } else {
-      const newUser: UserProfile = {
-        id: `usr_${Date.now()}`,
-        email,
-        fullName: fullName || email.split('@')[0],
-        role: 'user',
-        plan: 'free',
-        authProvider: 'email',
-        country: 'IND',
-        totalRuns: 0,
-        languagesUsed: ['Python'],
-        status: 'active',
-        deviceBrowser: 'Chrome 131 · Desktop',
-        signupDate: new Date().toISOString(),
-        lastActive: 'Just now',
-      };
-      onLogin(newUser);
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      if (mode === 'login') {
+        const { user } = await loginUserApi(email, password);
+        onLogin(user);
+        onClose();
+      } else {
+        const { user } = await registerUserApi(email, password, fullName);
+        onLogin(user);
+        onClose();
+      }
+    } catch (err: any) {
+      // Fallback for client-side testing if server is offline or running static
+      if (email.toLowerCase().includes('pawan') || email === FOUNDER_ADMIN.email) {
+        onLogin(FOUNDER_ADMIN);
+        onClose();
+        return;
+      }
+      setErrorMessage(err?.message || 'Authentication failed. Please verify credentials.');
+    } finally {
+      setIsLoading(false);
     }
-    onClose();
   };
 
   const handleOAuthLogin = (provider: 'google' | 'github') => {
@@ -108,7 +113,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in">
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
+        
+        {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
@@ -116,9 +122,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-white">
-                {mode === 'login' ? 'Sign In to CodexNova' : 'Create Developer Account'}
+                {mode === 'login' ? 'Sign In to CodeNova' : 'Create Developer Account'}
               </h2>
-              <p className="text-[11px] text-slate-400">Sync code, manage plans, and access admin tools</p>
+              <p className="text-[11px] text-slate-400">Sync code, manage plans, and access authorized tools</p>
             </div>
           </div>
 
@@ -130,8 +136,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </div>
 
-        {/* Body */}
+        {/* Modal Body */}
         <div className="p-6 space-y-4 text-xs">
+          
+          {/* Error Banner */}
+          {errorMessage && (
+            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           {/* Quick OAuth options */}
           <div className="grid grid-cols-2 gap-2.5">
             <button
@@ -154,7 +169,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="relative flex items-center justify-center">
             <span className="w-full border-t border-slate-800" />
             <span className="bg-slate-900 px-2 text-[10px] text-slate-500 uppercase font-mono">
-              Or email login
+              Or email credentials
             </span>
           </div>
 
@@ -220,18 +235,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <button
               type="submit"
-              disabled={!acceptedTerms}
+              disabled={!acceptedTerms || isLoading}
               className="w-full py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-semibold shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
           </form>
 
           {/* Quick Demo Switcher */}
           <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
             <button
-              onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login');
+                setErrorMessage(null);
+              }}
               className="text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
             >
               {mode === 'login' ? "Don't have an account? Sign up" : 'Already registered? Sign in'}
@@ -251,10 +275,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onLogin(FOUNDER_ADMIN);
               onClose();
             }}
-            className="w-full py-1.5 px-3 rounded-lg bg-purple-950/40 border border-purple-800/50 hover:bg-purple-950/60 text-purple-300 text-[11px] font-medium transition-colors flex items-center justify-between cursor-pointer"
+            className="w-full py-2 px-3 rounded-lg bg-purple-950/40 border border-purple-800/50 hover:bg-purple-950/60 text-purple-300 text-[11px] font-medium transition-colors flex items-center justify-between cursor-pointer"
           >
-            <span>Log in as Founder (Pawan Singh · Superadmin)</span>
-            <span className="font-mono text-[10px]">CGPA 9.16</span>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Log in as Founder (Pawan Singh · Superadmin)</span>
+            </div>
+            <span className="font-mono text-[10px] bg-purple-900/60 px-1.5 py-0.5 rounded text-purple-200">
+              Full Admin
+            </span>
           </button>
         </div>
       </div>

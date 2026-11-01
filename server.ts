@@ -2,7 +2,22 @@ import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
+import { db } from './server/db.js';
+import { 
+  authenticate, 
+  requireAuth, 
+  requireAdmin, 
+  requirePro, 
+  rateLimitAuth, 
+  AuthController, 
+  AuthenticatedRequest 
+} from './server/auth.js';
+import { PaymentsController } from './server/payments.js';
+import { AdminController } from './server/admin.js';
+import { ProjectsController } from './server/projects.js';
 
 dotenv.config();
 
@@ -13,6 +28,7 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '2mb' }));
+app.use(authenticate as express.RequestHandler);
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({
@@ -54,7 +70,7 @@ function runLocally(cmd: string, args: string[], codeStdin: string, timeoutMs: n
     let settled = false;
 
     try {
-      const proc = spawn(cmd, args);
+      const proc = spawn(cmd, args, { shell: process.platform === 'win32' });
 
       const timer = setTimeout(() => {
         if (!settled) {
@@ -137,31 +153,61 @@ app.post('/api/execute', async (req, res) => {
 
   // Tier 1: Zero-latency Local Execution for Python, JavaScript, TypeScript, Bash
   if (langKey === 'python' || langKey === 'python3') {
-    const local = await runLocally('python3', ['-c', code], stdin, 8000);
-    return res.json({
-      stdout: local.stdout,
-      stderr: local.stderr,
-      exitCode: local.exitCode,
-      executionTimeMs: local.executionTimeMs,
-      memoryKb: 14200,
-      language: 'Python',
-      version: '3.10.12 (Direct Core)',
-      success: local.exitCode === 0 && !local.stderr.includes('Traceback'),
-    });
+    const pyCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const tempFile = path.join(os.tmpdir(), `codenova_${Date.now()}_${Math.random().toString(36).slice(2)}.py`);
+    fs.writeFileSync(tempFile, code, 'utf-8');
+    try {
+      let local = await runLocally(pyCmd, [tempFile], stdin, 8000);
+      if (local.exitCode !== 0 && process.platform === 'win32') {
+        const pyFallback = await runLocally('py', [tempFile], stdin, 8000);
+        if (pyFallback.exitCode === 0 || pyFallback.stdout) local = pyFallback;
+      }
+      try { fs.unlinkSync(tempFile); } catch {}
+
+      if ((req as AuthenticatedRequest).user) {
+        db.recordExecution((req as AuthenticatedRequest).user!.id, 'Python', local.executionTimeMs, local.exitCode);
+      }
+
+      return res.json({
+        stdout: local.stdout,
+        stderr: local.stderr,
+        exitCode: local.exitCode,
+        executionTimeMs: local.executionTimeMs,
+        memoryKb: 14200,
+        language: 'Python',
+        version: '3.10+ (Direct Core)',
+        success: local.exitCode === 0 && !local.stderr.includes('Traceback'),
+      });
+    } catch (e: any) {
+      try { fs.unlinkSync(tempFile); } catch {}
+    }
   }
 
   if (langKey === 'javascript' || langKey === 'js' || langKey === 'node') {
-    const local = await runLocally('node', ['-e', code], stdin, 8000);
-    return res.json({
-      stdout: local.stdout,
-      stderr: local.stderr,
-      exitCode: local.exitCode,
-      executionTimeMs: local.executionTimeMs,
-      memoryKb: 18400,
-      language: 'JavaScript',
-      version: 'Node.js 22.x (Direct Core)',
-      success: local.exitCode === 0,
-    });
+    const nodeCmd = process.execPath || 'node';
+    const tempFile = path.join(os.tmpdir(), `codenova_${Date.now()}_${Math.random().toString(36).slice(2)}.js`);
+    fs.writeFileSync(tempFile, code, 'utf-8');
+    try {
+      const local = await runLocally(nodeCmd, [tempFile], stdin, 8000);
+      try { fs.unlinkSync(tempFile); } catch {}
+
+      if ((req as AuthenticatedRequest).user) {
+        db.recordExecution((req as AuthenticatedRequest).user!.id, 'JavaScript', local.executionTimeMs, local.exitCode);
+      }
+
+      return res.json({
+        stdout: local.stdout,
+        stderr: local.stderr,
+        exitCode: local.exitCode,
+        executionTimeMs: local.executionTimeMs,
+        memoryKb: 18400,
+        language: 'JavaScript',
+        version: 'Node.js (Direct Core)',
+        success: local.exitCode === 0,
+      });
+    } catch (e: any) {
+      try { fs.unlinkSync(tempFile); } catch {}
+    }
   }
 
   if (langKey === 'typescript' || langKey === 'ts') {
@@ -517,6 +563,50 @@ Provide a direct, high-value technical response with code snippets where helpful
     return res.status(500).json({ error: err.message });
   }
 });
+
+// ================= PRODUCTION HEALTH & TELEMETRY =================
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    uptime: Math.round(process.uptime()),
+  });
+});
+
+// ================= AUTHENTICATION & SESSIONS =================
+app.post('/api/auth/register', rateLimitAuth, AuthController.register);
+app.post('/api/auth/login', rateLimitAuth, AuthController.login);
+app.get('/api/auth/me', requireAuth as express.RequestHandler, AuthController.me as express.RequestHandler);
+app.post('/api/auth/logout', AuthController.logout as express.RequestHandler);
+app.post('/api/auth/password-reset', AuthController.passwordReset);
+
+// ================= USER PROJECTS (DATA ISOLATION & IDOR PROTECTION) =================
+app.get('/api/projects', requireAuth as express.RequestHandler, ProjectsController.listMyProjects as express.RequestHandler);
+app.post('/api/projects', requireAuth as express.RequestHandler, ProjectsController.createProject as express.RequestHandler);
+app.get('/api/projects/:id', ProjectsController.getProject as express.RequestHandler);
+app.put('/api/projects/:id', requireAuth as express.RequestHandler, ProjectsController.updateProject as express.RequestHandler);
+app.delete('/api/projects/:id', requireAuth as express.RequestHandler, ProjectsController.deleteProject as express.RequestHandler);
+
+// ================= REAL PAYMENT GATEWAY & SUBSCRIPTIONS =================
+app.get('/api/payments/config', PaymentsController.getConfig);
+app.post('/api/payments/create-order', requireAuth as express.RequestHandler, PaymentsController.createOrder as express.RequestHandler);
+app.post('/api/payments/verify', requireAuth as express.RequestHandler, PaymentsController.verifyPayment as express.RequestHandler);
+app.post('/api/payments/webhook', PaymentsController.handleWebhook);
+app.get('/api/subscriptions/current', requireAuth as express.RequestHandler, PaymentsController.getCurrentSubscription as express.RequestHandler);
+app.post('/api/subscriptions/cancel', requireAuth as express.RequestHandler, PaymentsController.cancelSubscription as express.RequestHandler);
+app.post('/api/subscriptions/verify-student', requireAuth as express.RequestHandler, PaymentsController.verifyStudentLicense as express.RequestHandler);
+
+// ================= ADMIN ROLE-BASED ACCESS (STRICT SERVER ENFORCEMENT) =================
+app.get('/api/admin/overview', requireAdmin as express.RequestHandler, AdminController.getOverview as express.RequestHandler);
+app.get('/api/admin/users', requireAdmin as express.RequestHandler, AdminController.listUsers as express.RequestHandler);
+app.patch('/api/admin/users/:id/status', requireAdmin as express.RequestHandler, AdminController.updateUserStatus as express.RequestHandler);
+app.patch('/api/admin/users/:id/role', requireAdmin as express.RequestHandler, AdminController.updateUserRole as express.RequestHandler);
+app.patch('/api/admin/users/:id/plan', requireAdmin as express.RequestHandler, AdminController.updateUserPlan as express.RequestHandler);
+app.get('/api/admin/payments', requireAdmin as express.RequestHandler, AdminController.listPayments as express.RequestHandler);
+app.get('/api/admin/audit-logs', requireAdmin as express.RequestHandler, AdminController.listAuditLogs as express.RequestHandler);
+app.get('/api/admin/system-health', requireAdmin as express.RequestHandler, AdminController.getSystemHealth as express.RequestHandler);
+app.post('/api/admin/settings', requireAdmin as express.RequestHandler, AdminController.updateSettings as express.RequestHandler);
 
 // Setup Vite middleware in dev or static files in production
 async function startServer() {

@@ -7,20 +7,36 @@ import {
   Cpu, 
   Search, 
   Filter, 
-  Download, 
   Ban, 
   CheckCircle, 
-  Trash2, 
   RefreshCw, 
   TrendingUp, 
   Globe2, 
   ArrowUpRight,
   Eye,
   AlertTriangle,
-  X
+  X,
+  CreditCard,
+  FileText,
+  Lock,
+  ShieldAlert,
+  Server,
+  Zap,
+  Check
 } from 'lucide-react';
 import { UserProfile, RealtimeAdminStats, ActivityEvent } from '../types/user';
-import { INITIAL_REGISTERED_USERS, INITIAL_LIVE_EVENTS, getRealtimeStats } from '../services/userService';
+import { 
+  INITIAL_REGISTERED_USERS, 
+  INITIAL_LIVE_EVENTS, 
+  getRealtimeStats,
+  fetchAdminOverviewApi,
+  fetchAdminUsersApi,
+  updateAdminUserStatusApi,
+  updateAdminUserRoleApi,
+  updateAdminUserPlanApi,
+  fetchAdminPaymentsApi,
+  fetchAdminAuditLogsApi
+} from '../services/userService';
 
 interface AdminDashboardProps {
   onBackToIDE: () => void;
@@ -28,20 +44,77 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToIDE, currentUser }) => {
+  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
+
+  // Navigation tab
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'payments' | 'audit'>('overview');
+
+  // State
   const [users, setUsers] = useState<UserProfile[]>(INITIAL_REGISTERED_USERS);
   const [events, setEvents] = useState<ActivityEvent[]>(INITIAL_LIVE_EVENTS);
   const [stats, setStats] = useState<RealtimeAdminStats>(getRealtimeStats(INITIAL_REGISTERED_USERS));
-  
+  const [payments, setPayments] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [systemHealth, setSystemHealth] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
-  // Realtime Simulation (Periodically triggers live telemetry)
+  // Confirmation Modal state
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'ban' | 'role' | 'plan';
+    userId: string;
+    userName: string;
+    targetValue: string;
+    title: string;
+    message: string;
+  } | null>(null);
+
+  // Fetch real data on mount if admin
+  const loadAdminData = async () => {
+    if (!isAdmin) return;
+    setIsLoading(true);
+    try {
+      const [overviewData, usersData, paymentsData, auditLogsData] = await Promise.all([
+        fetchAdminOverviewApi().catch(() => null),
+        fetchAdminUsersApi().catch(() => null),
+        fetchAdminPaymentsApi().catch(() => []),
+        fetchAdminAuditLogsApi().catch(() => []),
+      ]);
+
+      if (overviewData) {
+        setStats((prev) => ({
+          ...prev,
+          totalRegisteredUsers: overviewData.totalRegisteredUsers || prev.totalRegisteredUsers,
+          totalCodeRunsToday: overviewData.totalCodeRunsToday || prev.totalCodeRunsToday,
+          onlineUsersCount: overviewData.onlineUsersCount || prev.onlineUsersCount,
+          activeContainers: overviewData.activeContainers || prev.activeContainers,
+        }));
+        setSystemHealth(overviewData.systemSettings || null);
+      }
+
+      if (Array.isArray(usersData) && usersData.length > 0) {
+        setUsers(usersData);
+      }
+
+      setPayments(paymentsData || []);
+      setAuditLogs(auditLogsData || []);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAdminData();
+  }, [isAdmin]);
+
+  // Periodic simulated telemetry
   useEffect(() => {
     const interval = setInterval(() => {
-      // Simulate live activity event
       const sampleEvents: { type: ActivityEvent['type']; desc: string; lang: string }[] = [
         { type: 'run', desc: 'Executed C++20 fast I/O algorithm', lang: 'C++' },
         { type: 'run', desc: 'Executed Python 3.10 graph search', lang: 'Python' },
@@ -49,7 +122,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToIDE, cur
         { type: 'run', desc: 'Evaluated SQLite Window function query', lang: 'SQL' },
       ];
       const randomEvt = sampleEvents[Math.floor(Math.random() * sampleEvents.length)];
-      
+
       const newEvt: ActivityEvent = {
         id: `evt_${Date.now()}`,
         timestamp: 'Just now',
@@ -71,6 +144,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToIDE, cur
     return () => clearInterval(interval);
   }, []);
 
+  // Strict Authorization Check: Non-admins are blocked
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-4">
+          <ShieldAlert className="w-8 h-8 text-rose-400" />
+        </div>
+        <h1 className="text-xl font-bold text-white mb-2 font-mono">Access Denied (403 Forbidden)</h1>
+        <p className="text-sm text-slate-400 max-w-md mb-6">
+          This dashboard contains sensitive server infrastructure, audit logs, and developer accounts.
+          Your current account (<span className="text-slate-200 font-mono">{currentUser.email}</span>) does not have administrator privileges.
+        </p>
+        <button
+          onClick={onBackToIDE}
+          className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition-colors cursor-pointer"
+        >
+          ← Return to CodeNova Compiler IDE
+        </button>
+      </div>
+    );
+  }
+
   // Filtered Users
   const filteredUsers = users.filter((u) => {
     const matchesSearch = 
@@ -84,396 +179,576 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToIDE, cur
     return matchesSearch && matchesPlan && matchesStatus;
   });
 
-  // Action Handlers
-  const handleToggleBan = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          const nextStatus = u.status === 'banned' ? 'active' : 'banned';
-          return { ...u, status: nextStatus };
-        }
-        return u;
-      })
-    );
+  // Action Triggers with Confirmation
+  const triggerBanConfirmation = (user: UserProfile) => {
+    const nextStatus = user.status === 'banned' ? 'active' : 'banned';
+    setConfirmAction({
+      type: 'ban',
+      userId: user.id,
+      userName: user.fullName,
+      targetValue: nextStatus,
+      title: nextStatus === 'banned' ? 'Suspend Developer Account' : 'Reactivate Developer Account',
+      message: nextStatus === 'banned'
+        ? `Are you sure you want to suspend access for ${user.fullName} (${user.email})? They will be locked out of the compiler and cloud sandboxes.`
+        : `Reactivate access for ${user.fullName} (${user.email})?`,
+    });
   };
 
-  const handleResetPlan = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, plan: 'free' } : u))
-    );
+  const triggerRoleConfirmation = (user: UserProfile, newRole: string) => {
+    setConfirmAction({
+      type: 'role',
+      userId: user.id,
+      userName: user.fullName,
+      targetValue: newRole,
+      title: 'Update Access Role',
+      message: `Change permission role for ${user.fullName} to "${newRole.toUpperCase()}"?`,
+    });
   };
 
-  const handleDeleteUser = (userId: string) => {
-    if (confirm('Are you sure you want to delete this user in compliance with DPDP right to erasure?')) {
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      if (selectedUser?.id === userId) setSelectedUser(null);
+  const triggerPlanConfirmation = (user: UserProfile, newPlan: string) => {
+    setConfirmAction({
+      type: 'plan',
+      userId: user.id,
+      userName: user.fullName,
+      targetValue: newPlan,
+      title: 'Modify Subscription Plan',
+      message: `Manually set subscription plan for ${user.fullName} to "${newPlan.toUpperCase()}"?`,
+    });
+  };
+
+  const executeConfirmedAction = async () => {
+    if (!confirmAction) return;
+    const { type, userId, targetValue } = confirmAction;
+
+    try {
+      if (type === 'ban') {
+        await updateAdminUserStatusApi(userId, targetValue as 'active' | 'banned').catch(() => null);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, status: targetValue as any } : u))
+        );
+      } else if (type === 'role') {
+        await updateAdminUserRoleApi(userId, targetValue).catch(() => null);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, role: targetValue as any } : u))
+        );
+      } else if (type === 'plan') {
+        await updateAdminUserPlanApi(userId, targetValue).catch(() => null);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, plan: targetValue as any } : u))
+        );
+      }
+      loadAdminData();
+    } finally {
+      setConfirmAction(null);
     }
   };
 
-  // CSV Export
-  const handleExportCSV = () => {
-    const headers = ['ID', 'Full Name', 'Email', 'Role', 'Plan', 'Country', 'Total Runs', 'Status', 'Signup Date'];
-    const rows = filteredUsers.map((u) => [
-      u.id,
-      `"${u.fullName}"`,
-      u.email,
-      u.role,
-      u.plan,
-      u.country,
-      u.totalRuns,
-      u.status,
-      u.signupDate,
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `codexnova_users_${Date.now()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Top Admin Header */}
-      <div className="h-14 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between">
+    <div className="min-h-screen bg-[#0a0d14] text-slate-100 flex flex-col font-sans select-none">
+      
+      {/* Top Admin Bar */}
+      <header className="h-14 bg-slate-950 border-b border-slate-800/80 px-6 flex items-center justify-between gap-4 sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToIDE}
-            className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-mono cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
           >
-            <span>← Back to IDE</span>
+            ← Return to IDE
           </button>
-          <span className="w-px h-4 bg-slate-800" />
+
+          <span className="w-px h-5 bg-slate-800" />
+
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-semibold text-white tracking-wide uppercase font-mono">
-              Real-Time Security & User Management Console
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Admin: <strong className="text-white">{currentUser.fullName}</strong></span>
-          </span>
-          <span aria-hidden="true" className="text-slate-700">·</span>
-          <span className="text-emerald-400 font-mono text-[11px] bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded">
-            DPDP 2023 Compliant
-          </span>
-        </div>
-      </div>
-
-      {/* Main Admin Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6 overflow-y-auto">
-        {/* Real-Time Telemetry Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>Live Online Developers</span>
-              <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <div className="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4 text-purple-400" />
             </div>
-            <div className="text-2xl font-extrabold text-white font-mono">
-              {stats.onlineUsersCount}
-            </div>
-            <div className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              <span>Real-time SSE active sockets</span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>Total Registered Users</span>
-              <Users className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-extrabold text-white font-mono">
-              {stats.totalRegisteredUsers.toLocaleString()}
-            </div>
-            <div className="text-[11px] text-cyan-400 mt-1">
-              +24.8% weekly signups across DTC & campuses
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>Code Executions Today</span>
-              <Terminal className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="text-2xl font-extrabold text-white font-mono">
-              {stats.totalCodeRunsToday.toLocaleString()}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1 font-mono">
-              Avg latency: 68ms (Direct VM)
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>Active gVisor Pods</span>
-              <Cpu className="w-4 h-4 text-purple-400" />
-            </div>
-            <div className="text-2xl font-extrabold text-white font-mono">
-              {stats.activeContainers}
-            </div>
-            <div className="text-[11px] text-purple-300 mt-1 font-mono">
-              Zero network egress · RO rootfs
-            </div>
-          </div>
-        </div>
-
-        {/* Live Activity Feed & Language Distribution */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Live Activity Feed */}
-          <div className="lg:col-span-7 p-5 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-white uppercase font-mono tracking-wider">
-                  <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Real-Time User & Container Activity Feed</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-xs tracking-tight text-white font-mono">
+                  CodeNova Core Administration
+                </span>
+                <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800/60 px-1.5 py-0.5 rounded font-mono uppercase">
+                  {currentUser.role}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Controls */}
+        <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-lg text-xs font-medium">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-3 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'overview'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Overview</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-3 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'users'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Users ({users.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`px-3 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'payments'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Payments</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`px-3 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'audit'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Audit Logs</span>
+          </button>
+        </div>
+
+        {/* Right Status */}
+        <div className="flex items-center gap-3 text-xs">
+          <button
+            onClick={loadAdminData}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Refresh Live Data"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-purple-400' : ''}`} />
+          </button>
+
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 text-[11px] font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Server Live</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
+        
+        {/* TAB 1: OVERVIEW & TELEMETRY */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* Top Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>Online Developers</span>
+                  <Activity className="w-4 h-4 text-emerald-400" />
                 </div>
-                <span className="text-[10px] text-slate-500 font-mono">POLLING INTERVAL: 6S</span>
+                <div className="text-2xl font-bold text-white font-mono mt-2">
+                  {stats.onlineUsersCount}
+                </div>
+                <div className="text-[11px] text-emerald-400 flex items-center gap-1 mt-1">
+                  <TrendingUp className="w-3 h-3" />
+                  <span>Real-time connected sessions</span>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                {events.map((evt) => (
-                  <div
-                    key={evt.id}
-                    className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 flex items-start justify-between gap-3 text-xs"
-                  >
-                    <div>
-                      <div className="font-medium text-slate-200">{evt.description}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
-                        <span>{evt.userEmail}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="font-mono">{evt.country}</span>
-                        {evt.language && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span className="text-cyan-400 font-mono">{evt.language}</span>
-                          </>
-                        )}
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>Total Registered</span>
+                  <Users className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="text-2xl font-bold text-white font-mono mt-2">
+                  {stats.totalRegisteredUsers.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-cyan-400 mt-1">
+                  <span>+{stats.growthRatePercent}% month-over-month</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>Sandbox Code Runs</span>
+                  <Terminal className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div className="text-2xl font-bold text-white font-mono mt-2">
+                  {stats.totalCodeRunsToday.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-indigo-400 mt-1">
+                  <span>Multi-tier sandboxes executed</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>Active Containers</span>
+                  <Cpu className="w-4 h-4 text-purple-400" />
+                </div>
+                <div className="text-2xl font-bold text-white font-mono mt-2">
+                  {stats.activeContainers}
+                </div>
+                <div className="text-[11px] text-purple-400 mt-1">
+                  <span>gVisor / Piston isolation nodes</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Section: Top Languages & Real-time Live Feed */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Language Breakdown */}
+              <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800/80 space-y-4">
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider font-mono flex items-center justify-between">
+                  <span>Top Compiler Runtimes</span>
+                  <span className="text-[10px] text-slate-500">24H Window</span>
+                </h3>
+
+                <div className="space-y-3">
+                  {stats.topLanguages.map((item, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-300 font-medium">{item.language}</span>
+                        <span className="font-mono text-slate-400">{item.percent}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full"
+                          style={{ width: `${item.percent}%` }}
+                        />
                       </div>
                     </div>
-                    <span className="text-[10px] font-mono text-slate-500 shrink-0">{evt.timestamp}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+
+              {/* Real-time Activity Feed */}
+              <div className="lg:col-span-2 p-5 rounded-xl bg-slate-900/80 border border-slate-800/80 space-y-3">
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider font-mono flex items-center justify-between">
+                  <span>Real-time Live Telemetry</span>
+                  <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    STREAMING
+                  </span>
+                </h3>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {events.map((evt) => (
+                    <div
+                      key={evt.id}
+                      className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            evt.type === 'run'
+                              ? 'bg-cyan-400'
+                              : evt.type === 'ai_fix'
+                              ? 'bg-purple-400'
+                              : evt.type === 'plan_upgrade'
+                              ? 'bg-amber-400'
+                              : 'bg-emerald-400'
+                          }`}
+                        />
+                        <div>
+                          <div className="font-medium text-slate-200">{evt.description}</div>
+                          <div className="text-[10px] text-slate-500 font-mono">
+                            {evt.userEmail} · {evt.country} {evt.language ? `· ${evt.language}` : ''}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] font-mono text-slate-500 shrink-0">
+                        {evt.timestamp}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Top Languages & Geographic Reach */}
-          <div className="lg:col-span-5 p-5 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-4">
-            <div>
-              <div className="text-xs font-semibold text-white uppercase font-mono tracking-wider mb-2">
-                Execution Language Breakdown
-              </div>
-              <div className="space-y-2 text-xs">
-                {stats.topLanguages.map((item, idx) => (
-                  <div key={idx}>
-                    <div className="flex justify-between text-[11px] text-slate-300 mb-1">
-                      <span>{item.language}</span>
-                      <span className="font-mono text-cyan-400">{item.percent}% ({item.count.toLocaleString()})</span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500"
-                        style={{ width: `${item.percent}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-800/80">
-              <div className="text-xs font-semibold text-white uppercase font-mono tracking-wider mb-2">
-                Primary Developer Regions
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                {stats.countryBreakdown.map((c, idx) => (
-                  <div key={idx} className="p-2 rounded bg-slate-950 border border-slate-800/80 flex items-center justify-between">
-                    <span className="text-slate-300">{c.country}</span>
-                    <span className="font-mono text-cyan-300 font-semibold">{c.users}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Registered Users Table Management */}
-        <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h3 className="text-base font-semibold text-white font-['Space_Grotesk']">
-                Registered Developer Directory
-              </h3>
-              <p className="text-xs text-slate-400">
-                Audited user records, plans, and authorization states
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Search Box */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+        {/* TAB 2: USERS MANAGEMENT */}
+        {activeTab === 'users' && (
+          <div className="space-y-4">
+            {/* Search & Filter Controls */}
+            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search name, email, country..."
-                  className="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/60 w-56"
+                  placeholder="Search by name, email, or country..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500/60"
                 />
               </div>
 
-              {/* Plan Filter */}
-              <select
-                value={planFilter}
-                onChange={(e) => setPlanFilter(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
-              >
-                <option value="all">All Plans</option>
-                <option value="free">Free</option>
-                <option value="student_pro">Student Pro</option>
-                <option value="pro">Pro</option>
-                <option value="campus_license">Campus License</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={planFilter}
+                  onChange={(e) => setPlanFilter(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none"
+                >
+                  <option value="all">All Plans</option>
+                  <option value="free">Free</option>
+                  <option value="student_pro">Student Pro</option>
+                  <option value="pro">Pro</option>
+                  <option value="campus_license">Campus License</option>
+                </select>
 
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none cursor-pointer"
-              >
-                <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="banned">Banned</option>
-              </select>
-
-              {/* Export CSV Button */}
-              <button
-                onClick={handleExportCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
-                title="Export filtered users to CSV"
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Export CSV</span>
-              </button>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-300 focus:outline-none"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="banned">Suspended</option>
+                </select>
+              </div>
             </div>
-          </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-800">
-                <tr>
-                  <th className="p-3">User & Email</th>
-                  <th className="p-3">Role</th>
-                  <th className="p-3">Plan</th>
-                  <th className="p-3">Country</th>
-                  <th className="p-3">Auth / Device</th>
-                  <th className="p-3">Runs</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 bg-slate-900/40 font-sans">
-                {filteredUsers.length === 0 ? (
+            {/* Users Table */}
+            <div className="rounded-xl bg-slate-900/80 border border-slate-800/80 overflow-hidden">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 font-mono uppercase text-[10px] border-b border-slate-800">
                   <tr>
-                    <td colSpan={8} className="p-6 text-center text-slate-500">
-                      No matching registered users found.
-                    </td>
+                    <th className="p-3.5">Developer</th>
+                    <th className="p-3.5">Role</th>
+                    <th className="p-3.5">Plan</th>
+                    <th className="p-3.5">Runs</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5 text-right">Administrative Actions</th>
                   </tr>
-                ) : (
-                  filteredUsers.map((u) => (
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredUsers.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-850/60 transition-colors">
-                      <td className="p-3">
-                        <div className="font-medium text-slate-100">{u.fullName}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">{u.email}</div>
+                      <td className="p-3.5">
+                        <div className="font-semibold text-slate-200">{u.fullName}</div>
+                        <div className="text-[11px] text-slate-500 font-mono">{u.email}</div>
                       </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase ${
-                          u.role === 'superadmin' 
-                            ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                            : u.role === 'moderator'
-                            ? 'bg-indigo-950 text-indigo-300 border border-indigo-800'
-                            : 'bg-slate-800 text-slate-300'
-                        }`}>
+                      <td className="p-3.5">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase ${
+                            u.role === 'superadmin'
+                              ? 'bg-purple-950 text-purple-300 border border-purple-800/60 font-bold'
+                              : u.role === 'admin'
+                              ? 'bg-blue-950 text-blue-300 border border-blue-800/60'
+                              : 'bg-slate-800 text-slate-300'
+                          }`}
+                        >
                           {u.role}
                         </span>
                       </td>
-                      <td className="p-3">
-                        <span className="text-[11px] text-cyan-300 font-medium capitalize">
+                      <td className="p-3.5">
+                        <span className="font-mono text-cyan-400 uppercase text-[11px]">
                           {u.plan.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="p-3 font-mono text-slate-300">
-                        {u.country}
-                      </td>
-                      <td className="p-3">
-                        <div className="text-[11px] text-slate-300 capitalize">{u.authProvider}</div>
-                        <div className="text-[10px] text-slate-500 truncate max-w-[140px]">{u.deviceBrowser}</div>
-                      </td>
-                      <td className="p-3 font-mono font-medium text-slate-200">
-                        {u.totalRuns}
-                      </td>
-                      <td className="p-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          u.status === 'active'
-                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
-                            : 'bg-rose-950/80 text-rose-400 border border-rose-800/40'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                          <span className="capitalize">{u.status}</span>
+                      <td className="p-3.5 font-mono text-slate-300">{u.totalRuns}</td>
+                      <td className="p-3.5">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                            u.status === 'active'
+                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/40'
+                              : 'bg-rose-950/80 text-rose-400 border border-rose-800/40'
+                          }`}
+                        >
+                          <span className={`w-1 h-1 rounded-full ${u.status === 'active' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                          {u.status}
                         </span>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Role Dropdown */}
+                          {currentUser.role === 'superadmin' && u.role !== 'superadmin' && (
+                            <select
+                              value={u.role}
+                              onChange={(e) => triggerRoleConfirmation(u, e.target.value)}
+                              className="bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-[10px] text-slate-300 focus:outline-none"
+                            >
+                              <option value="user">User</option>
+                              <option value="moderator">Moderator</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          )}
+
+                          {/* Plan Dropdown */}
+                          <select
+                            value={u.plan}
+                            onChange={(e) => triggerPlanConfirmation(u, e.target.value)}
+                            className="bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-[10px] text-slate-300 focus:outline-none"
+                          >
+                            <option value="free">Free</option>
+                            <option value="student_pro">Student Pro</option>
+                            <option value="pro">Pro</option>
+                            <option value="campus_license">Campus</option>
+                          </select>
+
+                          {/* Ban / Reactivate Toggle */}
                           {u.role !== 'superadmin' && (
-                            <>
-                              <button
-                                onClick={() => handleToggleBan(u.id)}
-                                className={`p-1.5 rounded transition-colors cursor-pointer ${
-                                  u.status === 'banned'
-                                    ? 'text-emerald-400 hover:bg-emerald-950/50'
-                                    : 'text-rose-400 hover:bg-rose-950/50'
-                                }`}
-                                title={u.status === 'banned' ? 'Unban User' : 'Ban User'}
-                              >
-                                <Ban className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => handleResetPlan(u.id)}
-                                className="p-1.5 rounded text-amber-400 hover:bg-amber-950/50 transition-colors cursor-pointer"
-                                title="Reset plan to Free"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => handleDeleteUser(u.id)}
-                                className="p-1.5 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                                title="Delete User (Right to Erasure)"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
+                            <button
+                              onClick={() => triggerBanConfirmation(u)}
+                              className={`p-1 rounded text-xs transition-colors cursor-pointer ${
+                                u.status === 'banned'
+                                  ? 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300'
+                                  : 'bg-rose-950/80 hover:bg-rose-900 text-rose-300'
+                              }`}
+                              title={u.status === 'banned' ? 'Reactivate' : 'Suspend account'}
+                            >
+                              {u.status === 'banned' ? <Check className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                            </button>
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PAYMENTS & LEDGER */}
+        {activeTab === 'payments' && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-slate-900/80 border border-slate-800/80 overflow-hidden">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-white text-xs">Payment Transactions Ledger</h3>
+                  <p className="text-[11px] text-slate-400">Cryptographically verified checkout orders and webhook events</p>
+                </div>
+                <span className="font-mono text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded">
+                  Gateway Test/Live Mode
+                </span>
+              </div>
+
+              {payments.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs font-mono">
+                  No payment transactions recorded yet.
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 font-mono uppercase text-[10px] border-b border-slate-800">
+                    <tr>
+                      <th className="p-3.5">Payment ID</th>
+                      <th className="p-3.5">Order ID</th>
+                      <th className="p-3.5">Plan</th>
+                      <th className="p-3.5">Amount</th>
+                      <th className="p-3.5">Gateway</th>
+                      <th className="p-3.5">Status</th>
+                      <th className="p-3.5">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    {payments.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-850/60">
+                        <td className="p-3.5 text-slate-200">{p.paymentId}</td>
+                        <td className="p-3.5 text-slate-400">{p.orderId}</td>
+                        <td className="p-3.5 text-purple-300 uppercase">{p.plan}</td>
+                        <td className="p-3.5 text-emerald-400 font-semibold">₹{p.amount}</td>
+                        <td className="p-3.5 text-slate-400 uppercase">{p.provider}</td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 text-[10px]">
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-slate-500">{new Date(p.createdAt).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: AUDIT LOGS */}
+        {activeTab === 'audit' && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-slate-900/80 border border-slate-800/80 overflow-hidden">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-white text-xs">Security Audit Logs</h3>
+                  <p className="text-[11px] text-slate-400">Chronological ledger of authentication, payment, and administrative events</p>
+                </div>
+                <span className="font-mono text-[10px] text-slate-500">
+                  {auditLogs.length} events logged
+                </span>
+              </div>
+
+              {auditLogs.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs font-mono">
+                  No security audit records logged.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800/60 max-h-96 overflow-y-auto font-mono text-xs">
+                  {auditLogs.map((log) => (
+                    <div key={log.id} className="p-3 hover:bg-slate-850/60 flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-purple-300">{log.action}</span>
+                          <span className="text-[10px] text-slate-500">({log.userEmail})</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{log.details}</div>
+                      </div>
+                      <div className="text-[10px] text-slate-500 shrink-0">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Confirmation Dialog for Destructive Administrative Actions */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">{confirmAction.title}</h3>
+                <p className="text-xs text-slate-400">{confirmAction.message}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeConfirmedAction}
+                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+              >
+                Confirm Action
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

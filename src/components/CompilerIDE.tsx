@@ -30,6 +30,8 @@ import { executeWasmLocally } from '../services/wasmExecutionService';
 interface CompilerIDEProps {
   onChangeView: (view: 'ide' | 'landing' | 'about' | 'admin') => void;
   currentView: 'ide' | 'landing' | 'about' | 'admin';
+  currentUser?: UserProfile;
+  onUpdateUser?: (user: UserProfile) => void;
 }
 
 // Initial starter project files
@@ -190,7 +192,12 @@ const INITIAL_TEST_CASES: TestCase[] = [
   },
 ];
 
-export const CompilerIDE: React.FC<CompilerIDEProps> = ({ onChangeView, currentView }) => {
+export const CompilerIDE: React.FC<CompilerIDEProps> = ({ 
+  onChangeView, 
+  currentView, 
+  currentUser: initialUser, 
+  onUpdateUser 
+}) => {
   const { showToast } = useToast();
 
   // Project Files State
@@ -278,8 +285,22 @@ export const CompilerIDE: React.FC<CompilerIDEProps> = ({ onChangeView, currentV
     return [];
   });
 
-  // User auth state
-  const [currentUser, setCurrentUser] = useState<UserProfile>(FOUNDER_ADMIN);
+  // User auth state synchronized with parent
+  const [currentUser, setCurrentUserState] = useState<UserProfile>(() => initialUser || FOUNDER_ADMIN);
+
+  useEffect(() => {
+    if (initialUser) {
+      setCurrentUserState(initialUser);
+    }
+  }, [initialUser]);
+
+  const setCurrentUser = (userOrUpdater: React.SetStateAction<UserProfile>) => {
+    setCurrentUserState((prev) => {
+      const next = typeof userOrUpdater === 'function' ? userOrUpdater(prev) : userOrUpdater;
+      if (onUpdateUser) onUpdateUser(next);
+      return next;
+    });
+  };
 
   // Modal open states
   const [isExplainOpen, setIsExplainOpen] = useState(false);

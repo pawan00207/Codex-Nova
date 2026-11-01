@@ -138,19 +138,21 @@ export const Header: React.FC<HeaderProps> = ({
             <span>About Founder</span>
           </button>
 
-          <button
-            onClick={() => onChangeView('admin')}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-              currentView === 'admin'
-                ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-            }`}
-            title="Real-time Admin Dashboard"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-            <span>Admin</span>
-            {isAdmin && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => onChangeView('admin')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                currentView === 'admin'
+                  ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+              }`}
+              title="Real-time Admin Dashboard (Authorized Only)"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Admin</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            </button>
+          )}
         </div>
 
         {/* Language Selector Dropdown (When on Compiler IDE) */}

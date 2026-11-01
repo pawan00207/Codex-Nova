@@ -150,7 +150,7 @@ export const INITIAL_REGISTERED_USERS: UserProfile[] = [
     country: 'RUS',
     totalRuns: 12,
     languagesUsed: ['Bash', 'C'],
-    status: 'banned', // Banned by gVisor CPU watchdog
+    status: 'banned',
     deviceBrowser: 'HeadlessChrome · Linux',
     signupDate: '2026-04-15T02:10:00Z',
     lastActive: 'Terminated',
@@ -209,7 +209,7 @@ export function getRealtimeStats(users: UserProfile[]): RealtimeAdminStats {
 
   return {
     onlineUsersCount: Math.floor(activeCount * 0.45) + 3,
-    totalRegisteredUsers: users.length + 12530, // Aggregate production count
+    totalRegisteredUsers: users.length + 12530,
     totalCodeRunsToday: totalRuns + 48200,
     activeContainers: 14,
     growthRatePercent: 24.8,
@@ -229,4 +229,241 @@ export function getRealtimeStats(users: UserProfile[]): RealtimeAdminStats {
       { country: 'Others', code: 'GLB', users: 300 },
     ],
   };
+}
+
+// ================= SESSION TOKEN STORAGE =================
+const TOKEN_KEY = 'codenova_auth_token_v1';
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {}
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {}
+}
+
+function getAuthHeaders(): HeadersInit {
+  const token = getAuthToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+// ================= AUTH API CALLS =================
+export async function loginUserApi(email: string, password: string): Promise<{ token: string; user: UserProfile }> {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to log in.');
+  }
+
+  setAuthToken(data.token);
+  return data;
+}
+
+export async function registerUserApi(
+  email: string,
+  password: string,
+  fullName: string,
+  country: string = 'IND'
+): Promise<{ token: string; user: UserProfile }> {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, fullName, country }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Registration failed.');
+  }
+
+  setAuthToken(data.token);
+  return data;
+}
+
+export async function fetchCurrentUserApi(): Promise<UserProfile | null> {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 401) clearAuthToken();
+      return null;
+    }
+    const data = await res.json();
+    return data.user;
+  } catch {
+    return null;
+  }
+}
+
+export async function logoutUserApi(): Promise<void> {
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+  } finally {
+    clearAuthToken();
+  }
+}
+
+// ================= ADMIN API CALLS =================
+export async function fetchAdminOverviewApi(): Promise<any> {
+  const res = await fetch('/api/admin/overview', {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Access denied: Admin credentials required.');
+  }
+  return res.json();
+}
+
+export async function fetchAdminUsersApi(): Promise<UserProfile[]> {
+  const res = await fetch('/api/admin/users', {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to fetch users list.');
+  }
+  const data = await res.json();
+  return data.users;
+}
+
+export async function updateAdminUserStatusApi(userId: string, status: 'active' | 'banned'): Promise<UserProfile> {
+  const res = await fetch(`/api/admin/users/${userId}/status`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update user status.');
+  return data.user;
+}
+
+export async function updateAdminUserRoleApi(userId: string, role: string): Promise<UserProfile> {
+  const res = await fetch(`/api/admin/users/${userId}/role`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ role }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update user role.');
+  return data.user;
+}
+
+export async function updateAdminUserPlanApi(userId: string, plan: string): Promise<UserProfile> {
+  const res = await fetch(`/api/admin/users/${userId}/plan`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ plan }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update user plan.');
+  return data.user;
+}
+
+export async function fetchAdminAuditLogsApi(limit: number = 50): Promise<any[]> {
+  const res = await fetch(`/api/admin/audit-logs?limit=${limit}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch audit logs.');
+  const data = await res.json();
+  return data.auditLogs;
+}
+
+export async function fetchAdminPaymentsApi(): Promise<any[]> {
+  const res = await fetch('/api/admin/payments', {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch payments ledger.');
+  const data = await res.json();
+  return data.payments;
+}
+
+// ================= PAYMENT & SUBSCRIPTION CALLS =================
+export async function fetchPaymentConfigApi(): Promise<any> {
+  const res = await fetch('/api/payments/config');
+  return res.json();
+}
+
+export async function createPaymentOrderApi(planId: string, billingCycle: 'monthly' | 'yearly'): Promise<any> {
+  const res = await fetch('/api/payments/create-order', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ planId, billingCycle }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Order creation failed.');
+  return data;
+}
+
+export async function verifyPaymentApi(params: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature?: string;
+  planId: string;
+  billingCycle: string;
+}): Promise<any> {
+  const res = await fetch('/api/payments/verify', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Signature verification failed.');
+  return data;
+}
+
+export async function verifyStudentLicenseApi(email: string, verificationCode: string): Promise<any> {
+  const res = await fetch('/api/subscriptions/verify-student', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ email, verificationCode }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Campus student verification failed.');
+  return data;
+}
+
+export async function fetchCurrentSubscriptionApi(): Promise<any> {
+  const res = await fetch('/api/subscriptions/current', {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function cancelSubscriptionApi(): Promise<any> {
+  const res = await fetch('/api/subscriptions/cancel', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Cancellation failed.');
+  return data;
 }

@@ -16,11 +16,38 @@ import { ArchitectureModal } from './components/ArchitectureModal';
 import CompilerIDE from './components/CompilerIDE';
 import { AboutPage } from './components/AboutPage';
 import { AdminDashboard } from './components/AdminDashboard';
-import { FOUNDER_ADMIN } from './services/userService';
+import { FOUNDER_ADMIN, fetchCurrentUserApi } from './services/userService';
+import { UserProfile } from './types/user';
 import { ToastProvider } from './components/Toast';
 
 export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
+
+  // User state
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    try {
+      const saved = localStorage.getItem('codenova_current_user_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return FOUNDER_ADMIN;
+  });
+
+  const handleUpdateUser = (user: UserProfile) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('codenova_current_user_v1', JSON.stringify(user));
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchCurrentUserApi()
+      .then((user) => {
+        if (user) {
+          handleUpdateUser(user);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // View state: 'ide' | 'landing' | 'about' | 'admin'
   const [currentView, setCurrentView] = useState<'ide' | 'landing' | 'about' | 'admin'>(() => {
@@ -78,7 +105,7 @@ export const App: React.FC = () => {
       {currentView === 'admin' && (
         <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
           <AdminDashboard
-            currentUser={FOUNDER_ADMIN}
+            currentUser={currentUser}
             onBackToIDE={() => handleViewChange('ide')}
           />
         </div>
@@ -104,6 +131,8 @@ export const App: React.FC = () => {
           <CompilerIDE
             onChangeView={handleViewChange}
             currentView={currentView}
+            currentUser={currentUser}
+            onUpdateUser={handleUpdateUser}
           />
         </div>
       )}
