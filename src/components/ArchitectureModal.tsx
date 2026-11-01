@@ -312,3 +312,5 @@ CREATE TABLE code_runs (
     </div>
   );
 };
+
+export default ArchitectureModal;

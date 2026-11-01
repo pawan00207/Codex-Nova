@@ -4,22 +4,22 @@ import { motion } from 'framer-motion';
 export const Stats: React.FC = () => {
   const statsData = [
     {
-      value: '20+',
-      label: 'Years Experience',
-      description: 'Pioneering interactive design, creative engineering, and high-performance frontend architecture.',
-      highlight: 'EST. 2006',
+      value: '10+',
+      label: 'Core Languages',
+      description: 'Native execution environments for Python, C++, Java, Rust, Go, JavaScript, TypeScript, SQL, Bash, PHP, and Ruby.',
+      highlight: 'MULTI-RUNTIME',
     },
     {
-      value: '95+',
-      label: 'Projects Done',
-      description: 'Conceived, architected, and shipped for visionary founders, design studios, and global enterprises.',
-      highlight: 'GLOBAL REACH',
+      value: '14K+',
+      label: 'Code Executions',
+      description: 'Zero-latency evaluation powered by sandboxed container runners and offline WebAssembly engines.',
+      highlight: 'ENTERPRISE BENCHMARK',
     },
     {
-      value: '200%',
-      label: 'Satisfied Clients',
-      description: 'Exceeding creative and technical benchmarks with relentless precision and enduring quality.',
-      highlight: 'RETENTION RATE',
+      value: '100%',
+      label: 'Free & Open Source',
+      description: 'Built for developers, engineering students, and competitive programmers worldwide with no paywalls.',
+      highlight: 'CAMPUS VERIFIED',
     },
   ];
 
@@ -46,9 +46,9 @@ export const Stats: React.FC = () => {
             <span className="w-8 h-px bg-stroke block" />
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal tracking-tight text-text-primary">
-            A legacy of{' '}
+            Engineered for{' '}
             <span className="font-display italic font-normal text-text-primary">
-              craftsmanship
+              performance
             </span>
           </h2>
         </motion.div>
@@ -72,7 +72,6 @@ export const Stats: React.FC = () => {
                 borderColor: 'hsl(var(--stroke))',
               }}
             >
-              {/* Top ambient hover glow */}
               <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full accent-gradient opacity-0 group-hover:opacity-10 blur-3xl transition-opacity duration-700 pointer-events-none" />
 
               <div>
@@ -83,18 +82,15 @@ export const Stats: React.FC = () => {
                   <span className="w-2 h-2 rounded-full bg-stroke group-hover:accent-gradient transition-colors" />
                 </div>
 
-                {/* Big Stat Value in font-display italic */}
                 <div className="font-display italic text-6xl sm:text-7xl md:text-8xl text-text-primary group-hover:text-white transition-colors leading-none tracking-tight mb-4">
                   {stat.value}
                 </div>
 
-                {/* Label */}
                 <h3 className="text-lg sm:text-xl font-medium text-text-primary mb-3">
                   {stat.label}
                 </h3>
               </div>
 
-              {/* Subtext description */}
               <p className="text-xs sm:text-sm text-muted leading-relaxed mt-4 pt-4 border-t border-stroke/40">
                 {stat.description}
               </p>

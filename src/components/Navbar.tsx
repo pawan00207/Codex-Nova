@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 
 interface NavbarProps {
-  onOpenResume?: () => void;
+  onOpenCompiler: () => void;
+  onOpenAbout?: () => void;
+  onOpenArchitecture?: () => void;
   onOpenSayHi?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenResume, onOpenSayHi }) => {
-  const [activeTab, setActiveTab] = useState<'Home' | 'Work' | 'Resume'>('Home');
+export const Navbar: React.FC<NavbarProps> = ({
+  onOpenCompiler,
+  onOpenAbout,
+  onOpenArchitecture,
+  onOpenSayHi,
+}) => {
+  const [activeTab, setActiveTab] = useState<'Home' | 'Compiler' | 'Features' | 'About'>('Home');
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -19,7 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenResume, onOpenSayHi }) => 
       if (workEl) {
         const workRect = workEl.getBoundingClientRect();
         if (workRect.top <= 200 && workRect.bottom >= 200) {
-          setActiveTab('Work');
+          setActiveTab('Features');
           return;
         }
       }
@@ -36,38 +43,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenResume, onOpenSayHi }) => 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleNavClick = (tab: 'Home' | 'Work' | 'Resume') => {
+  const handleNavClick = (tab: 'Home' | 'Compiler' | 'Features' | 'About') => {
     setActiveTab(tab);
     if (tab === 'Home') {
       const el = document.getElementById('hero');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    } else if (tab === 'Work') {
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (tab === 'Compiler') {
+      onOpenCompiler();
+    } else if (tab === 'Features') {
       const el = document.getElementById('selected-works');
       if (el) el.scrollIntoView({ behavior: 'smooth' });
-    } else if (tab === 'Resume') {
-      if (onOpenResume) {
-        onOpenResume();
-      } else {
+    } else if (tab === 'About') {
+      if (onOpenAbout) onOpenAbout();
+      else {
         const el = document.getElementById('stats');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
-
-  const handleSayHiClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (onOpenSayHi) {
-      onOpenSayHi();
-    } else {
-      const el = document.getElementById('contact');
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      } else {
-        window.location.href = 'mailto:hello@michaelsmith.com';
       }
     }
   };
@@ -84,19 +75,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenResume, onOpenSayHi }) => 
         }}
         aria-label="Main Navigation"
       >
-        {/* 1. Logo: 9x9 circle with accent gradient border (reverses direction on hover). Inner bg-bg circle with "JA" in font-display italic text-[13px]. Scales 110% on hover */}
+        {/* 1. Logo: 9x9 circle with accent gradient border (reverses direction on hover). Inner bg-bg circle with "CN" in font-display italic text-[13px]. Scales 110% on hover */}
         <button
           onClick={() => handleNavClick('Home')}
-          className="group relative w-9 h-9 rounded-full p-[1.5px] transition-transform duration-300 hover:scale-110 flex items-center justify-center shrink-0 focus:outline-none"
-          title="Portfolio Cosmic Home"
+          className="group relative w-9 h-9 rounded-full p-[1.5px] transition-transform duration-300 hover:scale-110 flex items-center justify-center shrink-0 focus:outline-none cursor-pointer"
+          title="CodexNova Home"
           aria-label="Home"
         >
-          {/* Accent gradient border that reverses direction on hover */}
           <div className="absolute inset-0 rounded-full accent-gradient group-hover:[background:linear-gradient(270deg,#89AACC_0%,#4E85BF_100%)] transition-all duration-500" />
-          {/* Inner circle */}
           <div className="relative z-10 w-full h-full rounded-full bg-bg flex items-center justify-center">
             <span className="font-display italic text-[13px] font-semibold text-text-primary tracking-tighter">
-              JA
+              CN
             </span>
           </div>
         </button>
@@ -104,21 +93,26 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenResume, onOpenSayHi }) => 
         {/* 2. Divider: w-px h-5 bg-stroke mx-1 (hidden on mobile) */}
         <div className="w-px h-5 bg-stroke mx-1 hidden sm:block" />
 
-        {/* 3. Nav links: ["Home", "Work", "Resume"] */}
+        {/* 3. Nav links */}
         <div className="flex items-center gap-0.5 sm:gap-1">
-          {(['Home', 'Work', 'Resume'] as const).map((tab) => {
-            const isActive = activeTab === tab;
+          {([
+            { id: 'Home', label: 'Home' },
+            { id: 'Compiler', label: 'Compiler (IDE)' },
+            { id: 'Features', label: 'Features' },
+            { id: 'About', label: 'About' },
+          ] as const).map(({ id, label }) => {
+            const isActive = activeTab === id;
             return (
               <button
-                key={tab}
-                onClick={() => handleNavClick(tab)}
+                key={id}
+                onClick={() => handleNavClick(id)}
                 className={`text-xs sm:text-sm font-medium rounded-full px-3 sm:px-4 py-1.5 sm:py-2 transition-colors duration-200 cursor-pointer ${
                   isActive
                     ? 'text-text-primary bg-stroke/60 font-semibold'
                     : 'text-muted hover:text-text-primary hover:bg-stroke/40'
                 }`}
               >
-                {tab}
+                {label}
               </button>
             );
           })}
@@ -127,22 +121,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenResume, onOpenSayHi }) => 
         {/* 4. Divider */}
         <div className="w-px h-5 bg-stroke mx-1 hidden sm:block" />
 
-        {/* 5. "Say hi" button: Same size as nav links. On hover, shows accent gradient border behind (using absolute span with inset: -2px). Inner content wrapped in bg-surface rounded-full backdrop-blur-md. Includes "↗" arrow */}
-        <a
-          href="#contact"
-          onClick={handleSayHiClick}
-          className="group relative inline-flex items-center rounded-full text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 text-text-primary transition-all duration-300 ml-1"
+        {/* 5. "Launch IDE" / "Say hi" button */}
+        <button
+          onClick={onOpenCompiler}
+          className="group relative inline-flex items-center rounded-full text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 text-text-primary transition-all duration-300 ml-1 cursor-pointer"
         >
           {/* Hover accent gradient border behind */}
           <span className="absolute -inset-[1.5px] rounded-full accent-gradient opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10" />
           <span className="absolute inset-0 rounded-full bg-surface/90 backdrop-blur-md border border-white/10 group-hover:border-transparent transition-colors duration-300 -z-[5]" />
           <span className="relative z-10 inline-flex items-center gap-1 font-medium">
-            <span>Say hi</span>
+            <span>Launch IDE</span>
             <span className="text-[13px] leading-none transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-              ↗
+              ⚡
             </span>
           </span>
-        </a>
+        </button>
       </nav>
     </header>
   );

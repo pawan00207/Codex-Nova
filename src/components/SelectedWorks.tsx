@@ -17,56 +17,56 @@ export interface Project {
 
 export const PROJECTS: Project[] = [
   {
-    id: 'automotive-motion',
-    title: 'Automotive Motion',
-    category: 'Motion & Spatial Design',
-    year: '2025',
-    description: 'An immersive cinematic digital experience and 3D configuration platform engineered for next-generation electric hypercars.',
-    image: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=1600&auto=format&fit=crop',
+    id: 'cloud-compiler-engine',
+    title: 'Cloud Compiler Engine',
+    category: 'Isolated Sandbox & WASM',
+    year: '2026',
+    description: 'Instant multi-language execution engine powered by sandboxed micro-containers and offline WebAssembly fallback. Supporting Python, C++, Rust, Go, TypeScript, Java, and more.',
+    image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=1600&auto=format&fit=crop',
     aspect: 'aspect-[16/10]',
     colSpan: 'md:col-span-7',
-    tags: ['WebGL', 'Automotive', 'GSAP', 'Shader Art'],
-    client: 'Apex Dynamics',
-    deliverables: 'Interactive 3D configurator, Design System, Motion Branding',
+    tags: ['Micro-Sandboxes', 'gVisor', 'WASM', '10+ Languages'],
+    client: 'CodexNova Core',
+    deliverables: 'Low-latency code evaluation, standard IO streams, memory and CPU constraints',
   },
   {
-    id: 'urban-architecture',
-    title: 'Urban Architecture',
-    category: 'Spatial & Visual Systems',
-    year: '2025',
-    description: 'A monolithic digital archive celebrating brutalist form, concrete structures, and architectural shadows across metropolitan Europe.',
-    image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=1200&auto=format&fit=crop',
+    id: 'ai-fixer-explainer',
+    title: 'AI Fixer & Explainer',
+    category: 'Intelligent Diagnostics',
+    year: '2026',
+    description: 'Autonomous syntax and runtime debugger powered by Gemini. Produces unified code diffs, root cause analysis, time/space complexity Big-O benchmarks, and line-by-line annotations.',
+    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200&auto=format&fit=crop',
     aspect: 'aspect-[4/3]',
     colSpan: 'md:col-span-5',
-    tags: ['Curation', 'Typography', 'Minimalism'],
-    client: 'Bauhaus Zurich',
-    deliverables: 'Monograph Design, Editorial Web Experience',
+    tags: ['Gemini AI', 'Unified Diff', 'Big-O Analysis', 'Auto-Fix'],
+    client: 'Developer Tooling',
+    deliverables: 'One-click error patching, complexity proofs, pedagogical breakdowns',
   },
   {
-    id: 'human-perspective',
-    title: 'Human Perspective',
-    category: 'Editorial & Photography',
-    year: '2024',
-    description: 'A study in human emotion, biometric expressions, and lighting dynamics captured through an intimate photographic series.',
-    image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1200&auto=format&fit=crop',
+    id: 'visual-execution-tracer',
+    title: 'Visual Execution Tracer',
+    category: 'Memory & State Visualizer',
+    year: '2026',
+    description: 'Step-by-step visual time-travel debugger. Inspect live variable mutations, stack frame allocations, and pointer references across algorithm iterations.',
+    image: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?q=80&w=1200&auto=format&fit=crop',
     aspect: 'aspect-[4/3]',
     colSpan: 'md:col-span-5',
-    tags: ['Photography', 'Editorial', 'Micro-interactions'],
-    client: 'Vogue Lab',
-    deliverables: 'Art Direction, Dynamic Grid Engine, Interactive Story',
+    tags: ['Memory Graph', 'Call Stack', 'Variable Inspector', 'Time-Travel'],
+    client: 'CS Learning Lab',
+    deliverables: 'Interactive timeline playback, memory heap rendering, state diffing',
   },
   {
-    id: 'brand-identity',
-    title: 'Brand Identity',
-    category: 'Design Engineering',
-    year: '2024',
-    description: 'A comprehensive visual language and digital identity system for a visionary algorithmic research laboratory.',
+    id: 'visual-flowchart-ast',
+    title: 'Visual Flowchart AST',
+    category: 'Algorithmic Graph Synthesis',
+    year: '2026',
+    description: 'Dynamic flowchart generator converting source code logic into clear, readable Mermaid diagrams with decision branches, loops, and terminal states.',
     image: 'https://images.unsplash.com/photo-1600132806370-bf17e65e942f?q=80&w=1600&auto=format&fit=crop',
     aspect: 'aspect-[16/10]',
     colSpan: 'md:col-span-7',
-    tags: ['Identity', 'Tokenomics', 'Component Library'],
-    client: 'Omni Research Group',
-    deliverables: 'Logo Suite, Typography Guidelines, High-Fidelity UI Toolkit',
+    tags: ['Mermaid.js', 'AST Parser', 'SVG Export', 'Control Flow'],
+    client: 'Visual Algorithms',
+    deliverables: 'Automatic flow-graph extraction, SVG/PNG export, high-res canvas rendering',
   },
 ];
 
@@ -95,44 +95,40 @@ export const SelectedWorks: React.FC<SelectedWorksProps> = ({
           className="flex flex-col md:flex-row md:items-end justify-between mb-12 md:mb-16 gap-6"
         >
           <div>
-            {/* Eyebrow: w-8 h-px bg-stroke + "Selected Work" text-xs text-muted uppercase tracking-[0.3em] */}
             <div className="flex items-center gap-3 mb-4">
               <span className="w-8 h-px bg-stroke block" />
               <span className="text-xs text-muted uppercase tracking-[0.3em] font-medium">
-                Selected Work
+                Core Modules
               </span>
             </div>
 
-            {/* Heading: "Featured *projects*" — italic word in font-display italic */}
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-normal tracking-tight text-text-primary">
               Featured{' '}
               <span className="font-display italic font-normal text-text-primary">
-                projects
+                capabilities
               </span>
             </h2>
 
-            {/* Subtext: "A selection of projects I've worked on, from concept to launch." */}
             <p className="text-sm md:text-base text-muted mt-3 max-w-lg">
-              A selection of projects I&apos;ve worked on, from concept to launch.
+              Explore the architectural pillars powering real-time compilation, memory tracing, and AI assistance.
             </p>
           </div>
 
-          {/* "View all work" button (desktop only, hidden md:inline-flex) — rounded-full with gradient hover border ring + right arrow */}
           <button
             onClick={onViewAllWork}
             className="group relative hidden md:inline-flex items-center rounded-full text-xs uppercase tracking-[0.2em] font-medium p-[1.5px] transition-all duration-300 hover:scale-105 shrink-0 cursor-pointer"
           >
             <span className="absolute inset-0 rounded-full accent-gradient opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <span className="relative z-10 inline-flex items-center gap-2 rounded-full px-5 py-2.5 bg-surface border border-stroke group-hover:border-transparent text-text-primary transition-all duration-300">
-              <span>View all work</span>
+              <span>Launch IDE</span>
               <span className="transition-transform duration-300 group-hover:translate-x-1">
-                →
+                ⚡
               </span>
             </span>
           </button>
         </motion.div>
 
-        {/* Bento Grid: grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6. Column spans alternate: 7/5/5/7 */}
+        {/* Bento Grid: 7/5/5/7 column spans */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6">
           {PROJECTS.map((project, idx) => (
             <motion.div
@@ -152,7 +148,6 @@ export const SelectedWorks: React.FC<SelectedWorksProps> = ({
                 borderColor: 'hsl(var(--stroke))',
               }}
             >
-              {/* Background image with object-cover group-hover:scale-105 */}
               <img
                 src={project.image}
                 alt={project.title}
@@ -160,7 +155,6 @@ export const SelectedWorks: React.FC<SelectedWorksProps> = ({
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
 
-              {/* Halftone overlay: radial-gradient(circle, #000 1px, transparent 1px) at 4x4px, opacity-20 mix-blend-multiply */}
               <div
                 className="absolute inset-0 halftone-overlay opacity-20 mix-blend-multiply pointer-events-none"
                 style={{
@@ -169,10 +163,8 @@ export const SelectedWorks: React.FC<SelectedWorksProps> = ({
                 }}
               />
 
-              {/* Subtle ambient gradient vignette */}
               <div className="absolute inset-0 bg-gradient-to-t from-bg/90 via-transparent to-transparent pointer-events-none opacity-80 group-hover:opacity-40 transition-opacity duration-300" />
 
-              {/* Default metadata on card bottom */}
               <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between z-10 transition-transform duration-300 group-hover:translate-y-2 group-hover:opacity-0">
                 <div>
                   <span className="text-[11px] text-muted tracking-[0.2em] uppercase font-mono block mb-1">
@@ -195,10 +187,9 @@ export const SelectedWorks: React.FC<SelectedWorksProps> = ({
                   {project.description}
                 </p>
 
-                {/* Hover label: pill with animated gradient border, white bg, "View — *Title*" (title in font-display italic) */}
                 <div className="relative p-[1.5px] rounded-full overflow-hidden accent-gradient-hover shadow-xl transform transition-transform duration-300 group-hover:scale-105">
                   <div className="rounded-full bg-white text-black px-6 py-2.5 text-xs sm:text-sm font-medium tracking-wide flex items-center gap-1.5 shadow-sm">
-                    <span>View —</span>
+                    <span>Inspect —</span>
                     <span className="font-display italic text-base sm:text-lg font-bold text-black">
                       {project.title}
                     </span>
