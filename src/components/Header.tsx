@@ -51,6 +51,7 @@ interface HeaderProps {
   isOnline: boolean;
   canInstallPwa?: boolean;
   onInstallPwa?: () => void;
+  onOpenProModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -79,11 +80,12 @@ export const Header: React.FC<HeaderProps> = ({
   isOnline,
   canInstallPwa,
   onInstallPwa,
+  onOpenProModal,
 }) => {
   const isAdmin = currentUser.role === 'admin' || currentUser.role === 'superadmin';
 
   return (
-    <header className="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between gap-3 select-none z-30 shrink-0">
+    <header className="h-14 bg-[#0a0d14] border-b border-slate-800/80 px-4 flex items-center justify-between gap-3 select-none z-30 shrink-0">
       {/* Brand & Main Nav Links */}
       <div className="flex items-center gap-3">
         <button 
@@ -359,6 +361,18 @@ export const Header: React.FC<HeaderProps> = ({
               ))}
             </div>
           </div>
+        )}
+
+        {/* Upgrade to Pro Trigger */}
+        {onOpenProModal && (
+          <button
+            onClick={onOpenProModal}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-violet-600/20 to-indigo-600/20 hover:from-violet-600/30 hover:to-indigo-600/30 border border-violet-500/40 text-violet-300 hover:text-white text-xs font-semibold shadow-sm transition-all cursor-pointer"
+            title="Unlock Pro features, cloud clusters, and team licenses"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+            <span>PRO</span>
+          </button>
         )}
 
         {/* User Auth Profile Trigger */}

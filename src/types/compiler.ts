@@ -67,3 +67,29 @@ export interface CodeProject {
   stdin: string;
   updatedAt: number;
 }
+
+export interface ProjectFile {
+  id: string;
+  name: string;
+  languageId: string;
+  content: string;
+  isModified?: boolean;
+}
+
+export interface TestCase {
+  id: string;
+  name: string;
+  input: string;
+  expectedOutput?: string;
+  actualOutput?: string;
+  status?: 'idle' | 'running' | 'passed' | 'failed';
+}
+
+export interface ExecutionHistoryItem {
+  id: string;
+  timestamp: number;
+  language: string;
+  code: string;
+  stdin: string;
+  result: ExecutionResult;
+}

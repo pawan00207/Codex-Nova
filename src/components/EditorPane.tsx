@@ -1,25 +1,65 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import { EditorTheme } from '../types/compiler';
+import { 
+  Maximize2, 
+  Minimize2, 
+  RotateCcw, 
+  RotateCw, 
+  AlignLeft, 
+  WrapText, 
+  MapPin, 
+  Check, 
+  X,
+  FileCode2,
+  Plus
+} from 'lucide-react';
+import { EditorTheme, ProjectFile } from '../types/compiler';
 
 interface EditorPaneProps {
+  files: ProjectFile[];
+  activeFileId: string;
+  onSelectFile: (fileId: string) => void;
+  onCloseFileTab: (fileId: string) => void;
+  onNewFileTab: () => void;
   code: string;
   onChangeCode: (newCode: string) => void;
   language: string;
   theme: EditorTheme;
   onRun: () => void;
-  fileName: string;
+  onSave?: () => void;
+  isSaved?: boolean;
+  fontSize: number;
+  tabSize: number;
+  wordWrap: boolean;
+  minimap: boolean;
+  onToggleWordWrap: () => void;
+  onToggleMinimap: () => void;
+  onChangeFontSize: (size: number) => void;
 }
 
 export const EditorPane: React.FC<EditorPaneProps> = ({
+  files,
+  activeFileId,
+  onSelectFile,
+  onCloseFileTab,
+  onNewFileTab,
   code,
   onChangeCode,
   language,
   theme,
   onRun,
-  fileName,
+  onSave,
+  isSaved = true,
+  fontSize,
+  tabSize,
+  wordWrap,
+  minimap,
+  onToggleWordWrap,
+  onToggleMinimap,
+  onChangeFontSize,
 }) => {
   const editorRef = useRef<any>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -65,9 +105,31 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onRun();
     });
+
+    // Bind Ctrl+S or Cmd+S to trigger Save
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KEY_S, () => {
+      if (onSave) onSave();
+    });
   };
 
-  // Map our theme names to Monaco themes
+  const handleUndo = () => {
+    if (editorRef.current) {
+      editorRef.current.trigger('toolbar', 'undo', null);
+    }
+  };
+
+  const handleRedo = () => {
+    if (editorRef.current) {
+      editorRef.current.trigger('toolbar', 'redo', null);
+    }
+  };
+
+  const handleFormat = () => {
+    if (editorRef.current) {
+      editorRef.current.getAction('editor.action.formatDocument')?.run();
+    }
+  };
+
   const getMonacoTheme = (th: EditorTheme): string => {
     if (th === 'cyberpunk') return 'cyberpunk';
     if (th === 'amoled') return 'amoled';
@@ -75,18 +137,122 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     return 'vs-dark';
   };
 
+  const activeFile = files.find((f) => f.id === activeFileId) || files[0];
+
   return (
-    <div className="relative w-full h-full flex flex-col bg-slate-950 overflow-hidden">
+    <div
+      className={`relative w-full h-full flex flex-col bg-slate-950 overflow-hidden ${
+        isFullscreen ? 'fixed inset-0 z-50' : ''
+      }`}
+    >
       {/* Editor File Tab Bar */}
-      <div className="h-9 bg-slate-900/90 border-b border-slate-800/80 px-4 flex items-center justify-between text-xs text-slate-400 select-none">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-cyan-400" />
-          <span className="font-mono text-slate-200 font-medium">{fileName}</span>
-          <span className="text-[10px] text-slate-500">· UTF-8</span>
+      <div className="h-9 bg-slate-900 border-b border-slate-800/80 px-2 flex items-center justify-between text-xs text-slate-400 select-none overflow-x-auto shrink-0">
+        
+        {/* Left: Open File Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
+          {files.map((file) => {
+            const isActive = file.id === activeFileId;
+            return (
+              <div
+                key={file.id}
+                onClick={() => onSelectFile(file.id)}
+                className={`group flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono transition-colors cursor-pointer border ${
+                  isActive
+                    ? 'bg-slate-800 text-slate-100 border-slate-700 shadow-sm'
+                    : 'bg-transparent text-slate-400 border-transparent hover:bg-slate-850 hover:text-slate-300'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                <span className="max-w-[120px] truncate">{file.name}</span>
+                {file.isModified && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved changes" />
+                )}
+                {files.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCloseFileTab(file.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-opacity cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          <button
+            onClick={onNewFileTab}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+            title="Open new file tab"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
-          <span>Tab: 4 spaces</span>
-          <span>Press ⌘+Enter to Run</span>
+
+        {/* Right: Quick Controls & Status */}
+        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 shrink-0">
+          {/* Save Status Indicator */}
+          <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400">
+            {isSaved ? (
+              <span className="flex items-center gap-1 text-emerald-400/90">
+                <Check className="w-3 h-3" />
+                <span>Saved</span>
+              </span>
+            ) : (
+              <span className="text-amber-400/90 font-medium">Auto-saving...</span>
+            )}
+          </div>
+
+          <span className="w-px h-3.5 bg-slate-800 hidden sm:block" />
+
+          {/* Undo / Redo */}
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={handleUndo}
+              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Undo (Ctrl+Z)"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleRedo}
+              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Redo (Ctrl+Y)"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Format Document */}
+          <button
+            onClick={handleFormat}
+            className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer hidden md:block"
+            title="Format Document (Shift+Alt+F)"
+          >
+            <AlignLeft className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Word Wrap Toggle */}
+          <button
+            onClick={onToggleWordWrap}
+            className={`p-1 rounded transition-colors cursor-pointer ${
+              wordWrap ? 'text-cyan-400 bg-slate-800' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+            title="Toggle Word Wrap (Alt+Z)"
+          >
+            <WrapText className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Editor'}
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
         </div>
       </div>
 
@@ -100,11 +266,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           onChange={(value) => onChangeCode(value || '')}
           onMount={handleEditorDidMount}
           options={{
-            fontSize: 13.5,
-            fontFamily: "'Fira Code', 'Courier New', monospace",
+            fontSize: fontSize || 13.5,
+            fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
             fontLigatures: true,
-            tabSize: 4,
-            minimap: { enabled: true, maxColumn: 40 },
+            tabSize: tabSize || 4,
+            wordWrap: wordWrap ? 'on' : 'off',
+            minimap: { enabled: minimap, maxColumn: 40 },
             scrollBeyondLastLine: false,
             smoothScrolling: true,
             cursorBlinking: 'smooth',
@@ -128,3 +295,5 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     </div>
   );
 };
+
+export default EditorPane;

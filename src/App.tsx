@@ -17,6 +17,7 @@ import CompilerIDE from './components/CompilerIDE';
 import { AboutPage } from './components/AboutPage';
 import { AdminDashboard } from './components/AdminDashboard';
 import { FOUNDER_ADMIN } from './services/userService';
+import { ToastProvider } from './components/Toast';
 
 export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -64,146 +65,144 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // 1. If currently in About view
-  if (currentView === 'about') {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-        <AboutPage onBackToIDE={() => handleViewChange('ide')} />
-      </div>
-    );
-  }
-
-  // 2. If currently in Admin view
-  if (currentView === 'admin') {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-        <AdminDashboard
-          currentUser={FOUNDER_ADMIN}
-          onBackToIDE={() => handleViewChange('ide')}
-        />
-      </div>
-    );
-  }
-
-  // 3. If currently in IDE view (Full Cloud Compiler)
-  if (currentView === 'ide') {
-    return (
-      <div className="relative w-screen h-screen overflow-hidden">
-        {/* Floating Switcher to view Cosmic Landing Page anytime */}
-        <div className="fixed bottom-4 right-4 z-40">
-          <button
-            onClick={() => handleViewChange('landing')}
-            className="group relative p-[1.5px] rounded-full accent-gradient shadow-xl hover:scale-105 transition-transform cursor-pointer"
-            title="View Cosmic Showcase / Landing Page"
-          >
-            <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface text-xs font-mono font-medium text-text-primary group-hover:bg-transparent group-hover:text-white transition-colors">
-              <span>Cosmic Landing</span>
-              <span>🌌</span>
-            </span>
-          </button>
-        </div>
-
-        <CompilerIDE
-          onChangeView={handleViewChange}
-          currentView={currentView}
-        />
-      </div>
-    );
-  }
-
-  // 4. If currently in Landing view (Portfolio Cosmic Landing Page)
   return (
-    <div className="min-h-screen bg-bg text-text-primary selection:bg-sky-500/25 selection:text-white font-body relative">
-      {/* Loading Screen on initial visit */}
-      {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
+    <ToastProvider>
+      {/* 1. If currently in About view */}
+      {currentView === 'about' && (
+        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+          <AboutPage onBackToIDE={() => handleViewChange('ide')} />
+        </div>
+      )}
 
-      {/* Persistent Quick Action to Launch Compiler */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => handleViewChange('ide')}
-          className="group relative p-[2px] rounded-full accent-gradient shadow-2xl hover:scale-110 transition-transform cursor-pointer"
-          title="Open Full Code Editor & Terminal"
-        >
-          <span className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-slate-900 text-sm font-mono font-semibold text-white group-hover:bg-transparent transition-colors">
-            <span>⚡ Launch Compiler (IDE)</span>
-          </span>
-        </button>
-      </div>
+      {/* 2. If currently in Admin view */}
+      {currentView === 'admin' && (
+        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+          <AdminDashboard
+            currentUser={FOUNDER_ADMIN}
+            onBackToIDE={() => handleViewChange('ide')}
+          />
+        </div>
+      )}
 
-      {/* Floating Navbar */}
-      <Navbar
-        onOpenCompiler={() => handleViewChange('ide')}
-        onOpenAbout={() => handleViewChange('about')}
-        onOpenArchitecture={() => setIsArchitectureOpen(true)}
-        onOpenSayHi={() => setIsContactOpen(true)}
-      />
+      {/* 3. If currently in IDE view (Full Cloud Compiler) */}
+      {currentView === 'ide' && (
+        <div className="relative w-screen h-screen overflow-hidden">
+          {/* Floating Switcher to view Cosmic Landing Page anytime */}
+          <div className="fixed bottom-4 right-4 z-40">
+            <button
+              onClick={() => handleViewChange('landing')}
+              className="group relative p-[1.5px] rounded-full accent-gradient shadow-xl hover:scale-105 transition-transform cursor-pointer"
+              title="View Cosmic Showcase / Landing Page"
+            >
+              <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface text-xs font-mono font-medium text-text-primary group-hover:bg-transparent group-hover:text-white transition-colors">
+                <span>Cosmic Landing</span>
+                <span>🌌</span>
+              </span>
+            </button>
+          </div>
 
-      <main className="relative z-0">
-        {/* Hero Section */}
-        <Hero
-          isLoading={isLoading}
-          onOpenCompiler={() => handleViewChange('ide')}
-          onOpenArchitecture={() => setIsArchitectureOpen(true)}
-        />
+          <CompilerIDE
+            onChangeView={handleViewChange}
+            currentView={currentView}
+          />
+        </div>
+      )}
 
-        {/* Selected Works (Core Capabilities) */}
-        <SelectedWorks
-          onSelectProject={(project) => setSelectedProject(project)}
-          onViewAllWork={() => handleViewChange('ide')}
-        />
+      {/* 4. If currently in Landing view (Portfolio Cosmic Landing Page) */}
+      {currentView === 'landing' && (
+        <div className="min-h-screen bg-bg text-text-primary selection:bg-sky-500/25 selection:text-white font-body relative">
+          {/* Loading Screen on initial visit */}
+          {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
 
-        {/* Journal (Engineering & Insights) */}
-        <Journal
-          onSelectArticle={(article) => setSelectedArticle(article)}
-          onViewAll={() => handleViewChange('ide')}
-        />
+          {/* Persistent Quick Action to Launch Compiler */}
+          <div className="fixed bottom-6 right-6 z-50">
+            <button
+              onClick={() => handleViewChange('ide')}
+              className="group relative p-[2px] rounded-full accent-gradient shadow-2xl hover:scale-110 transition-transform cursor-pointer"
+              title="Open Full Code Editor & Terminal"
+            >
+              <span className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-slate-900 text-sm font-mono font-semibold text-white group-hover:bg-transparent transition-colors">
+                <span>⚡ Launch Compiler (IDE)</span>
+              </span>
+            </button>
+          </div>
 
-        {/* Explorations (Parallax Visuals) */}
-        <Explorations
-          onOpenLightbox={(item) => setSelectedExploration(item)}
-        />
+          {/* Floating Navbar */}
+          <Navbar
+            onOpenCompiler={() => handleViewChange('ide')}
+            onOpenAbout={() => handleViewChange('about')}
+            onOpenArchitecture={() => setIsArchitectureOpen(true)}
+            onOpenSayHi={() => setIsContactOpen(true)}
+          />
 
-        {/* Stats */}
-        <Stats />
+          <main className="relative z-0">
+            {/* Hero Section */}
+            <Hero
+              isLoading={isLoading}
+              onOpenCompiler={() => handleViewChange('ide')}
+              onOpenArchitecture={() => setIsArchitectureOpen(true)}
+            />
 
-        {/* Contact & Footer */}
-        <Footer
-          onOpenCompiler={() => handleViewChange('ide')}
-          onContactClick={() => setIsContactOpen(true)}
-        />
-      </main>
+            {/* Selected Works (Core Capabilities) */}
+            <SelectedWorks
+              onSelectProject={(project) => setSelectedProject(project)}
+              onViewAllWork={() => handleViewChange('ide')}
+            />
 
-      {/* Modals & Overlays */}
-      <ProjectModal
-        project={selectedProject}
-        onClose={() => setSelectedProject(null)}
-      />
+            {/* Journal (Engineering & Insights) */}
+            <Journal
+              onSelectArticle={(article) => setSelectedArticle(article)}
+              onViewAll={() => handleViewChange('ide')}
+            />
 
-      <JournalModal
-        article={selectedArticle}
-        onClose={() => setSelectedArticle(null)}
-      />
+            {/* Explorations (Parallax Visuals) */}
+            <Explorations
+              onOpenLightbox={(item) => setSelectedExploration(item)}
+            />
 
-      <LightboxModal
-        item={selectedExploration}
-        onClose={() => setSelectedExploration(null)}
-      />
+            {/* Stats */}
+            <Stats />
 
-      <ResumeModal
-        isOpen={isResumeOpen}
-        onClose={() => setIsResumeOpen(false)}
-      />
+            {/* Contact & Footer */}
+            <Footer
+              onOpenCompiler={() => handleViewChange('ide')}
+              onContactClick={() => setIsContactOpen(true)}
+            />
+          </main>
 
-      <ContactModal
-        isOpen={isContactOpen}
-        onClose={() => setIsContactOpen(false)}
-      />
+          {/* Modals & Overlays */}
+          <ProjectModal
+            project={selectedProject}
+            onClose={() => setSelectedProject(null)}
+          />
 
-      <ArchitectureModal
-        isOpen={isArchitectureOpen}
-        onClose={() => setIsArchitectureOpen(false)}
-      />
-    </div>
+          <JournalModal
+            article={selectedArticle}
+            onClose={() => setSelectedArticle(null)}
+          />
+
+          <LightboxModal
+            item={selectedExploration}
+            onClose={() => setSelectedExploration(null)}
+          />
+
+          <ResumeModal
+            isOpen={isResumeOpen}
+            onClose={() => setIsResumeOpen(false)}
+          />
+
+          <ContactModal
+            isOpen={isContactOpen}
+            onClose={() => setIsContactOpen(false)}
+          />
+
+          <ArchitectureModal
+            isOpen={isArchitectureOpen}
+            onClose={() => setIsArchitectureOpen(false)}
+          />
+        </div>
+      )}
+    </ToastProvider>
   );
 };
 

@@ -158,7 +158,7 @@ sys.stdin = StringIO("""${stdin.replace(/"/g, '\\"')}""")
             outputLogs.push(expr.slice(1, -1));
           } else {
             try {
-              outputLogs.push(String(eval(expr)));
+              outputLogs.push(String((0, eval)(expr)));
             } catch {
               outputLogs.push(expr);
             }
